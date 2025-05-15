@@ -1,9 +1,18 @@
+# streamlit_app.py
+
+# 필수 패키지 설치
+# pip install streamlit
+# pip install sqlalchemy
+# pip install mysql-connector-python
+# pip install pytz
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import urllib.parse
 from sqlalchemy import create_engine
 from datetime import datetime
+import pytz  # 시간대 설정용
 
 # DB 접속 설정
 user = urllib.parse.quote_plus('user1')
@@ -12,8 +21,19 @@ host = '59.9.20.28'
 db = 'investar'
 engine = create_engine(f'mysql+mysqlconnector://{user}:{password}@{host}/{db}')
 
-# 오늘 날짜
-today_str = datetime.today().strftime('%Y-%m-%d')
+# 한국 시간 기준 날짜 설정
+kst = pytz.timezone('Asia/Seoul')
+today_kst = datetime.now(kst).strftime('%Y-%m-%d')
+
+# 최신 날짜 자동 감지
+def get_latest_available_date():
+    sql = "SELECT MAX(date) as latest_date FROM trend_following"
+    result = pd.read_sql(sql, engine).iloc[0]['latest_date']
+    # 문자열을 datetime으로 변환 후 반환
+    return datetime.strptime(result, '%Y-%m-%d')
+
+latest_date = get_latest_available_date()
+latest_date_str = latest_date.strftime('%Y-%m-%d')
 
 # 데이터 불러오기
 @st.cache_data(ttl=600)
@@ -39,9 +59,9 @@ def load_data(date_str):
 
 # Streamlit 앱 구성
 st.title("🔎 오늘의 추천 종목")
-st.write(f"날짜 기준: {today_str}")
+st.write(f"날짜 기준: {latest_date_str} (KST 기준)")
 
-sheet1, sheet2 = load_data(today_str)
+sheet1, sheet2 = load_data(latest_date_str)
 
 # 공통 종목 찾기
 common = pd.merge(sheet1, sheet2, on='code1')
