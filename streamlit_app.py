@@ -19,8 +19,8 @@ import matplotlib.dates as mdates
 import koreanize_matplotlib
 
 # DB 접속 설정
-user = urllib.parse.quote_plus('user1')
-password = urllib.parse.quote_plus('user1!!')
+user = urllib.parse.quote_plus('user2')
+password = urllib.parse.quote_plus('user2!!')
 host = '59.9.20.28'
 db = 'investar'
 engine = create_engine(f'mysql+mysqlconnector://{user}:{password}@{host}/{db}')
