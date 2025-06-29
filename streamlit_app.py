@@ -1,12 +1,5 @@
 # streamlit_app.py
 
-# pip install matplotlib
-# pip install streamlit
-# pip install sqlalchemy
-# pip install mysql-connector-python
-# pip install pytz
-# pip install koreanize-matplotlib
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -29,36 +22,13 @@ engine = create_engine(f'mysql+mysqlconnector://{user}:{password}@{host}/{db}')
 kst = pytz.timezone('Asia/Seoul')
 today_kst = datetime.now(kst).strftime('%Y-%m-%d')
 
-# 최신 날짜 자동 감지
 def get_latest_available_date():
     sql = "SELECT MAX(date) as latest_date FROM trend_following"
     result = pd.read_sql(sql, engine).iloc[0]['latest_date']
-    return result  # 이미 문자열 형태로 들어옴
+    return result
 
 latest_date_str = get_latest_available_date()
 
-# 주가 차트 그리기 함수
-# def plot_stock_chart(code):
-#     sql = f"""
-#     SELECT date, close FROM daily_price
-#     WHERE code = '{code}' AND date >= DATE_SUB('{latest_date_str}', INTERVAL 90 DAY)
-#     ORDER BY date
-#     """
-#     df = pd.read_sql(sql, engine)
-#     if df.empty:
-#         return None
-#     fig, ax = plt.subplots(figsize=(6, 3))
-#     ax.plot(pd.to_datetime(df['date']), df['close'], marker='o', linestyle='-')
-#     ax.set_title(f"최근 3개월 주가 흐름", fontsize=12)
-#     ax.set_xlabel("날짜")
-#     ax.set_ylabel("종가")
-#     ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
-#     ax.xaxis.set_major_formatter(mdates.DateFormatter('%y%m%d'))
-#     plt.xticks(rotation=0)
-#     plt.tight_layout()
-#     return fig
-
-# 주가 분석 및 차트 그리기 함수 (DB 활용)
 def plot_trend_following_chart(code):
     sql = f"""
     SELECT date, open, high, low, close, volume
@@ -89,7 +59,7 @@ def plot_trend_following_chart(code):
             df.NMF.values[i + 1] = df.TP.values[i + 1] * df.volume.values[i + 1]
             df.PMF.values[i + 1] = 0
 
-    df['MFR'] = (df.PMF.rolling(window=10).sum() / df.NMF.rolling(window=10).sum())
+    df['MFR'] = df.PMF.rolling(window=10).sum() / df.NMF.rolling(window=10).sum()
     df['MFI10'] = 100 - 100 / (1 + df['MFR'])
     df = df[19:]
 
@@ -101,7 +71,7 @@ def plot_trend_following_chart(code):
     ax1.plot(df.index, df['lower'], 'c--', label='Lower band')
     ax1.fill_between(df.index, df['upper'], df['lower'], color='0.9')
     for i in range(len(df.close)):
-        if df.PB.values[i] > 0.8 and df.MFI10.values[i] > 80:
+        if df.PB.values[i] > 0.6 and df.MFI10.values[i] > 60:
             ax1.plot(df.index[i], df.close.values[i], 'r^')
         elif df.PB.values[i] < 0.2 and df.MFI10.values[i] < 20:
             ax1.plot(df.index[i], df.close.values[i], 'bv')
@@ -111,7 +81,7 @@ def plot_trend_following_chart(code):
     ax2.plot(df.index, df['MFI10'], 'g--', label='MFI(10 day)')
     ax2.set_yticks([-20, 0, 20, 40, 60, 80, 100, 120])
     for i in range(len(df.close)):
-        if df.PB.values[i] > 0.8 and df.MFI10.values[i] > 80:
+        if df.PB.values[i] > 0.6 and df.MFI10.values[i] > 60:
             ax2.plot(df.index[i], 0, 'r^')
         elif df.PB.values[i] < 0.2 and df.MFI10.values[i] < 20:
             ax2.plot(df.index[i], 0, 'bv')
@@ -120,7 +90,6 @@ def plot_trend_following_chart(code):
     plt.tight_layout()
     return fig
 
-# 뉴스 불러오기 함수
 def get_positive_news(code):
     sql = f"""
     SELECT title, url, rating2_reason
@@ -131,7 +100,6 @@ def get_positive_news(code):
     """
     return pd.read_sql(sql, engine)
 
-# 데이터 불러오기
 @st.cache_data(ttl=600)
 def load_data(date_str):
     sql1 = f"""
@@ -148,17 +116,25 @@ def load_data(date_str):
     """
     sheet2 = pd.read_sql(sql2, engine)
 
+    sql3 = f"""
+    SELECT code, predicted_return
+    FROM predicted_returns
+    WHERE date = '{date_str}' AND predicted_return >= 0.02
+    """
+    sheet3 = pd.read_sql(sql3, engine)
+
     sheet1['code1'] = sheet1['code'].astype(str).str.zfill(6)
     sheet2['code1'] = sheet2['code'].astype(str).str.zfill(6)
+    sheet3['code1'] = sheet3['code'].astype(str).str.zfill(6)
 
-    return sheet1, sheet2
+    return sheet1, sheet2, sheet3
 
-# Streamlit 앱 구성
 st.title("🔎 오늘의 추천 종목")
 st.write(f"날짜 기준: {latest_date_str} (KST 기준)")
 
-sheet1, sheet2 = load_data(latest_date_str)
+sheet1, sheet2, sheet3 = load_data(latest_date_str)
 common = pd.merge(sheet1, sheet2, on='code1')
+common = pd.merge(common, sheet3[['code1', 'predicted_return']], on='code1', how='left')
 
 st.subheader("✅ 매수 시그널 + 긍정 뉴스 종목")
 
@@ -167,12 +143,14 @@ if not common.empty:
         st.markdown(f"### {row['company_x']} ({row['code1']})")
         st.markdown(f"- 매수 시그널 발생 (날짜: {latest_date_str})")
         st.markdown(f"- 긍정 뉴스 개수: {row['n_pos_news']}")
+        if not pd.isna(row.get('predicted_return')):
+            st.markdown(f"- 📈 인공지능 예측 수익률: {row['predicted_return']:.2%}")
 
         news_df = get_positive_news(row['code_x'])
         if not news_df.empty:
             st.markdown("**📌 긍정 뉴스 목록:**")
             for _, news in news_df.iterrows():
-                st.markdown(f"- [{news['title']}]({news['url']})  ")
+                st.markdown(f"- [{news['title']}]({news['url']})")
                 st.caption(f"→ 이유: {news['rating2_reason']}")
 
         chart = plot_trend_following_chart(row['code_x'])
@@ -181,3 +159,4 @@ if not common.empty:
         st.markdown("---")
 else:
     st.write("추천 종목이 없습니다.")
+
