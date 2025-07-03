@@ -136,8 +136,8 @@ sheet1, sheet2, sheet3 = load_data(latest_date_str)
 common = pd.merge(sheet1, sheet2, on='code1')
 common = pd.merge(common, sheet3[['code1', 'predicted_return']], on='code1', how='left')
 
-# 예측 수익률 0.02 이상 필터 + 상위 10개 종목만
-common = common[common['predicted_return'] >= 0.01]
+# 예측 수익률 0.00 이상 필터 + 상위 10개 종목만
+common = common[common['predicted_return'] > 0.00]
 common = common.sort_values(by='predicted_return', ascending=False).head(10)
 
 st.subheader("✅ 매수 시그널 + 긍정 뉴스 종목")
