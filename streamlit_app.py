@@ -119,7 +119,7 @@ def load_data(date_str):
     sql3 = f"""
     SELECT code, predicted_return
     FROM predicted_returns
-    WHERE date = '{date_str}' AND predicted_return >= 0.01
+    WHERE date = '{date_str}' AND predicted_return > 0
     """
     sheet3 = pd.read_sql(sql3, engine)
 
