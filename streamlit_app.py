@@ -134,7 +134,10 @@ st.write(f"날짜 기준: {latest_date_str} (KST 기준)")
 
 sheet1, sheet2, sheet3 = load_data(latest_date_str)
 common = pd.merge(sheet1, sheet2, on='code1')
-common = pd.merge(common, sheet3[['code1', 'predicted_return']], on='code1', how='left')
+
+# sheet3에서 code1 기준으로 중복 제거 (첫 번째 값 유지)
+sheet3_dedup = sheet3[['code1', 'predicted_return']].drop_duplicates(subset=['code1'], keep='first')
+common = pd.merge(common, sheet3_dedup, on='code1', how='left')
 
 # 예측 수익률 0.00 이상 필터 + 상위 10개 종목만
 common = common[common['predicted_return'] > 0.00]
